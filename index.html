@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa Conceptual Interactivo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .map-container {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            overflow: hidden;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .concept-node {
+            position: absolute;
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            font-weight: 600;
+            min-width: 120px;
+            user-select: none;
+        }
+
+        .concept-node:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .concept-node.active {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(78, 205, 196, 0.5);
+        }
+
+        .concept-node.secondary {
+            background: linear-gradient(45deg, #f093fb, #f5576c);
+            font-size: 0.9em;
+            padding: 10px 15px;
+            min-width: 100px;
+        }
+
+        .concept-node.tertiary {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            font-size: 0.8em;
+            padding: 8px 12px;
+            min-width: 80px;
+        }
+
+        .connection-line {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.3));
+            transform-origin: left center;
+            transition: all 0.3s ease;
+            z-index: 1;
+        }
+
+        .connection-line.active {
+            background: linear-gradient(90deg, rgba(78, 205, 196, 0.5), rgba(78, 205, 196, 0.8), rgba(78, 205, 196, 0.5));
+            height: 3px;
+        }
+
+        .info-panel {
+            position: fixed;
+            top: 50%;
+            right: -400px;
+            width: 350px;
+            height: 400px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transform: translateY(-50%);
+            transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .info-panel.active {
+            right: 20px;
+        }
+
+        .info-panel h3 {
+            color: #333;
+            margin-top: 0;
+            font-size: 1.5em;
+            border-bottom: 2px solid #4ecdc4;
+            padding-bottom: 10px;
+        }
+
+        .info-panel p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .info-panel ul {
+            color: #666;
+            padding-left: 20px;
+        }
+
+        .info-panel li {
+            margin-bottom: 8px;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            transition: color 0.3s ease;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .instructions {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 20px;
+            font-size: 1.1em;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Mapa Conceptual Interactivo</h1>
+        <div class="instructions">
+            Haz clic en cualquier concepto para explorar sus conexiones y obtener más información
+        </div>
+        
+        <div class="map-container" id="mapContainer">
+            <!-- Los nodos se generarán dinámicamente -->
+        </div>
+    </div>
+
+    <div class="info-panel" id="infoPanel">
+        <button class="close-btn" onclick="closeInfoPanel()">×</button>
+        <div id="infoPanelContent"></div>
+    </div>
+
+    <script>
+        const conceptsData = {
+            "Inteligencia Artificial": {
+                position: { x: 400, y: 150 },
+                type: "main",
+                connections: ["Machine Learning", "Procesamiento de Lenguaje Natural", "Visión Computacional"],
+                info: {
+                    title: "Inteligencia Artificial",
+                    description: "La IA es la simulación de procesos de inteligencia humana mediante máquinas, especialmente sistemas informáticos.",
+                    details: [
+                        "Incluye el aprendizaje, razonamiento y autocorrección",
+                        "Aplicaciones en múltiples industrias",
+                        "Evolución constante desde los años 1950",
+                        "Combina ciencias de la computación, matemáticas y psicología"
+                    ]
+                }
+            },
+            "Machine Learning": {
+                position: { x: 150, y: 100 },
+                type: "secondary",
+                connections: ["Redes Neuronales", "Algoritmos Supervisados", "Aprendizaje Profundo"],
+                info: {
+                    title: "Machine Learning",
+                    description: "Subcampo de la IA que permite a las máquinas aprender automáticamente sin ser programadas explícitamente.",
+                    details: [
+                        "Utiliza datos para mejorar el rendimiento",
+                        "Tres tipos principales: supervisado, no supervisado y por refuerzo",
+                        "Base de muchas aplicaciones modernas",
+                        "Requiere grandes cantidades de datos"
+                    ]
+                }
+            },
+            "Procesamiento de Lenguaje Natural": {
+                position: { x: 650, y: 100 },
+                type: "secondary",
+                connections: ["Análisis de Sentimientos", "Chatbots", "Traducción Automática"],
+                info: {
+                    title: "Procesamiento de Lenguaje Natural",
+                    description: "Área de la IA que se enfoca en la interacción entre computadoras y lenguaje humano.",
+                    details: [
+                        "Comprende y genera lenguaje humano",
+                        "Aplicaciones en búsqueda web y asistentes virtuales",
+                        "Combina lingüística y ciencias de la computación",
+                        "Desafíos incluyen ambigüedad y contexto"
+                    ]
+                }
+            },
+            "Visión Computacional": {
+                position: { x: 400, y: 300 },
+                type: "secondary",
+                connections: ["Reconocimiento de Imágenes", "Detección de Objetos", "Realidad Aumentada"],
+                info: {
+                    title: "Visión Computacional",
+                    description: "Campo que desarrolla técnicas para que las computadoras interpreten y comprendan el mundo visual.",
+                    details: [
+                        "Procesa y analiza imágenes digitales",
+                        "Aplicaciones en medicina, automoción y seguridad",
+                        "Utiliza deep learning para mejorar precisión",
+                        "Imita la percepción visual humana"
+                    ]
+                }
+            },
+            "Redes Neuronales": {
+                position: { x: 50, y: 50 },
+                type: "tertiary",
+                connections: [],
+                info: {
+                    title: "Redes Neuronales",
+                    description: "Sistemas computacionales inspirados en las redes neuronales biológicas del cerebro.",
+                    details: [
+                        "Compuestas por nodos interconectados",
+                        "Aprenden mediante ajuste de pesos",
+                        "Base del deep learning",
+                        "Capaces de reconocer patrones complejos"
+                    ]
+                }
+            },
+            "Algoritmos Supervisados": {
+                position: { x: 150, y: 30 },
+                type: "tertiary",
+                connections: [],
+                info: {
+                    title: "Algoritmos Supervisados",
+                    description: "Técnicas de machine learning que aprenden de datos etiquetados.",
+                    details: [
+                        "Utilizan ejemplos de entrada-salida",
+                        "Incluyen regresión y clasificación",
+                        "Ejemplos: SVM, Random Forest, Regresión Linear",
+                        "Requieren datos de entrenamiento etiquetados"
+                    ]
+                }
+            },
+            "Aprendizaje Profundo": {
+                position: { x: 250, y: 50 },
+                type: "tertiary",
+                connections: [],
+                info: {
+                    title: "Aprendizaje Profundo",
+                    description: "Subconjunto del machine learning que utiliza redes neuronales multicapa.",
+                    details: [
+                        "Automatiza la extracción de características",
+                        "Excelente para datos no estructurados",
+                        "Requiere gran poder computacional",
+                        "Revolucionó la IA en la última década"
+                    ]
+                }
+            },
+            "Análisis de Sentimientos": {
+                position: { x: 550, y: 50 },
+                type: "tertiary",
+                connections: [],
+                info: {
+                    title: "Análisis de Sentimientos",
+                    description: "Técnica para determinar el tono emocional de un texto.",
+                    details: [
+                        "Clasifica texto como positivo, negativo o neutral",
+                        "Útil para monitoreo de redes sociales",
+                        "Aplicaciones en marketing y servicio al cliente",
+                        "Desafíos incluyen sarcasmo y contexto"
+                    ]
+                }
+            },
+            "Chatbots": {
+                position: { x: 650, y: 30 },
+                type: "tertiary",
+                connections: [],
+                info: {
+                    title: "Chatbots",
+                    description: "Programas de computadora diseñados para simular conversaciones humanas.",
+                    details: [
+                        "Automatización de atención al cliente",
+                        "Utilizan NLP para comprender queries",
+                        "Evolucionan hacia asistentes más sofisticados",
+                        "Mejoran eficiencia y disponibilidad 24/7"
+                    ]
+                }
+            },
+            "Traducción Automática": {
+                position: { x: 750, y: 50 },
+                type: "tertiary",
+                connections: [],
+                info: {
+                    title: "Traducción Automática",
+                    description: "Uso de software para traducir texto de un idioma a otro.",
+                    details: [
+                        "Facilita comunicación global",
+                        "Mejoras significativas con neural networks",
+                        "Desafíos con idiomas de baja frecuencia",
+                        "Aplicaciones en comercio internacional"
+                    ]
+                }
+            },
+            "Reconocimiento de Imágenes": {
+                position: { x: 300, y: 400 },
+                type: "tertiary",
+                connections: [],
+                info: {
+                    title: "Reconocimiento de Imágenes",
+                    description: "Capacidad de identificar y clasificar objetos en imágenes digitales.",
+                    details: [
+                        "Utiliza CNN para análisis de patrones",
+                        "Aplicaciones en fotografía y medicina",
+                        "Precisión superior a humanos en algunos casos",
+                        "Base para vehículos autónomos"
+                    ]
+                }
+            },
+            "Detección de Objetos": {
+                position: { x: 400, y: 450 },
+                type: "tertiary",
+                connections: [],
+                info: {
+                    title: "Detección de Objetos",
+                    description: "Técnica para localizar y clasificar múltiples objetos en una imagen.",
+                    details: [
+                        "Combina clasificación y localización",
+                        "Algoritmos como YOLO y R-CNN",
+                        "Aplicaciones en seguridad y robótica",
+                        "Procesamiento en tiempo real"
+                    ]
+                }
+            },
+            "Realidad Aumentada": {
+                position: { x: 500, y: 400 },
+                type: "tertiary",
+                connections: [],
+                info: {
+                    title: "Realidad Aumentada",
+                    description: "Tecnología que superpone información digital sobre el mundo real.",
+                    details: [
+                        "Integra elementos virtuales y reales",
+                        "Aplicaciones en entretenimiento y educación",
+                        "Utiliza visión computacional para tracking",
+                        "Creciente adopción en dispositivos móviles"
+                    ]
+                }
+            }
+        };
+
+        let activeNode = null;
+        let connections = [];
+
+        function createNode(concept, data) {
+            const node = document.createElement('div');
+            node.className = `concept-node ${data.type}`;
+            node.textContent = concept;
+            node.style.left = data.position.x + 'px';
+            node.style.top = data.position.y + 'px';
+            node.onclick = () => selectNode(concept, node);
+            return node;
+        }
+
+        function createConnection(from, to) {
+            const fromData = conceptsData[from];
+            const toData = conceptsData[to];
+            
+            const line = document.createElement('div');
+            line.className = 'connection-line';
+            
+            const fromX = fromData.position.x + 60;
+            const fromY = fromData.position.y + 25;
+            const toX = toData.position.x + 60;
+            const toY = toData.position.y + 25;
+            
+            const distance = Math.sqrt(Math.pow(toX - fromX, 2) + Math.pow(toY - fromY, 2));
+            const angle = Math.atan2(toY - fromY, toX - fromX) * 180 / Math.PI;
+            
+            line.style.left = fromX + 'px';
+            line.style.top = fromY + 'px';
+            line.style.width = distance + 'px';
+            line.style.transform = `rotate(${angle}deg)`;
+            
+            return line;
+        }
+
+        function selectNode(concept, node) {
+            // Remover selección anterior
+            if (activeNode) {
+                activeNode.classList.remove('active');
+            }
+            
+            // Limpiar conexiones anteriores
+            connections.forEach(conn => {
+                conn.classList.remove('active');
+            });
+            
+            // Activar nuevo nodo
+            node.classList.add('active');
+            activeNode = node;
+            
+            // Activar conexiones relacionadas
+            const data = conceptsData[concept];
+            data.connections.forEach(connectedConcept => {
+                const conn = connections.find(c => 
+                    c.dataset.from === concept && c.dataset.to === connectedConcept ||
+                    c.dataset.to === concept && c.dataset.from === connectedConcept
+                );
+                if (conn) {
+                    conn.classList.add('active');
+                }
+            });
+            
+            // Mostrar información
+            showInfo(data.info);
+        }
+
+        function showInfo(info) {
+            const panel = document.getElementById('infoPanel');
+            const content = document.getElementById('infoPanelContent');
+            
+            content.innerHTML = `
+                <h3>${info.title}</h3>
+                <p>${info.description}</p>
+                <ul>
+                    ${info.details.map(detail => `<li>${detail}</li>`).join('')}
+                </ul>
+            `;
+            
+            panel.classList.add('active');
+        }
+
+        function closeInfoPanel() {
+            document.getElementById('infoPanel').classList.remove('active');
+            if (activeNode) {
+                activeNode.classList.remove('active');
+                activeNode = null;
+            }
+            connections.forEach(conn => {
+                conn.classList.remove('active');
+            });
+        }
+
+        function initializeMap() {
+            const container = document.getElementById('mapContainer');
+            
+            // Crear nodos
+            Object.entries(conceptsData).forEach(([concept, data]) => {
+                const node = createNode(concept, data);
+                container.appendChild(node);
+            });
+            
+            // Crear conexiones
+            Object.entries(conceptsData).forEach(([concept, data]) => {
+                data.connections.forEach(connectedConcept => {
+                    if (conceptsData[connectedConcept]) {
+                        const connection = createConnection(concept, connectedConcept);
+                        connection.dataset.from = concept;
+                        connection.dataset.to = connectedConcept;
+                        connections.push(connection);
+                        container.appendChild(connection);
+                    }
+                });
+            });
+            
+            // Hacer el nodo principal pulse
+            const mainNode = document.querySelector('.concept-node');
+            if (mainNode) {
+                mainNode.classList.add('pulse');
+            }
+        }
+
+        // Inicializar cuando se carga la página
+        document.addEventListener('DOMContentLoaded', initializeMap);
+    </script>
+</body>
+</html>
